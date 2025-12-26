@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle, XCircle, Flag, Users, MapPin, Calendar, FileText, ChevronDown, AlertTriangle, TrendingUp, Send } from 'lucide-react';
+import { Bell, CheckCircle, XCircle, Flag, Users, MapPin, Calendar, FileText, ChevronDown, AlertTriangle, TrendingUp, Send, Eye, Camera, Download } from 'lucide-react';
 import api from '../utils/api';
 import { notifyError, notifySuccess } from '../components/NotificationToast';
 
 const VillageAdminDashboard = () => {
   const [issues, setIssues] = useState([]);
+  const [gramsevakCompletedIssues, setGramsevakCompletedIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [gramSabhaNotes, setGramSabhaNotes] = useState('');
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showCompletedDetailModal, setShowCompletedDetailModal] = useState(false);
+  const [selectedCompletedIssue, setSelectedCompletedIssue] = useState(null);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [selectedPriority, setSelectedPriority] = useState('');
   const [selectedGramSevak, setSelectedGramSevak] = useState('राजेश कुमार');
@@ -21,7 +24,7 @@ const VillageAdminDashboard = () => {
     'रमेश सिंह'
   ];
 
-  // Fetch issues from backend
+  // मुख्य issues fetch
   useEffect(() => {
     const fetchIssues = async () => {
       setLoading(true);
@@ -36,7 +39,6 @@ const VillageAdminDashboard = () => {
           assignedTo: issue.assignedTo || null
         }));
 
-        // Auto-set priority based on vote count
         fetchedIssues = fetchedIssues.map(issue => {
           const votes = issue.votes?.length || 0;
           let autoPriority = null;
@@ -50,7 +52,6 @@ const VillageAdminDashboard = () => {
           };
         });
 
-        // Sort by votes descending
         const sortedIssues = fetchedIssues.sort((a, b) => (b.votes?.length || 0) - (a.votes?.length || 0));
 
         setIssues(sortedIssues);
@@ -65,15 +66,31 @@ const VillageAdminDashboard = () => {
     fetchIssues();
   }, []);
 
+  // ग्रामसेवकाने पूर्ण केलेले काम fetch
+  useEffect(() => {
+    const fetchGramsevakCompleted = async () => {
+      try {
+        const res = await api.get('/issues/gramsevek/completed');
+        const completed = res.data.data || [];
+        setGramsevakCompletedIssues(completed);
+      } catch (err) {
+        console.error('Fetch completed issues error:', err);
+        setGramsevakCompletedIssues([]);
+      }
+    };
+
+    fetchGramsevakCompleted();
+  }, []);
+
   const stats = {
     pending: issues.filter(i => i.status === 'pending').length,
     high: issues.filter(i => i.priority === 'high').length,
     medium: issues.filter(i => i.priority === 'medium').length,
     low: issues.filter(i => i.priority === 'low').length,
     total: issues.length,
+    gramsevakCompleted: gramsevakCompletedIssues.length
   };
 
-  // Open assign modal
   const setInProgress = (id) => {
     const issue = issues.find(i => i._id === id);
     if (issue) {
@@ -83,7 +100,6 @@ const VillageAdminDashboard = () => {
     }
   };
 
-  // Approve issue
   const approveIssue = async (id) => {
     try {
       await api.patch(`/issues/${id}/approved`);
@@ -97,7 +113,6 @@ const VillageAdminDashboard = () => {
     }
   };
 
-  // Reject issue
   const rejectIssue = async (id) => {
     try {
       await api.patch(`/issues/${id}/rejected`);
@@ -111,7 +126,6 @@ const VillageAdminDashboard = () => {
     }
   };
 
-  // Send to Gram Sevak – FULLY UPDATED with proper error handling
   const sendToGramSevak = async () => {
     if (!selectedIssue || !selectedPriority || !selectedGramSevak) {
       notifyError('प्राधान्य आणि ग्रामसेवक निवडा');
@@ -124,7 +138,6 @@ const VillageAdminDashboard = () => {
         assignedTo: selectedGramSevak
       });
 
-      // Local UI update
       setIssues(issues.map(issue => 
         issue._id === selectedIssue._id 
           ? { ...issue, priority: selectedPriority.toLowerCase(), assignedTo: selectedGramSevak, status: 'in-progress' } 
@@ -134,13 +147,7 @@ const VillageAdminDashboard = () => {
       notifySuccess('समस्या ग्रामसेवकाला सोपवली!');
     } catch (err) {
       console.error('Assign error:', err);
-      if (err.response?.status === 404) {
-        notifyError('ही समस्या सापडली नाही – कदाचित delete झाली असेल');
-      } else if (err.response?.status === 500) {
-        notifyError('सर्व्हर त्रुटी – पुन्हा प्रयत्न करा');
-      } else {
-        notifyError('सोपवताना त्रुटी आली');
-      }
+      notifyError('सोपवताना त्रुटी आली');
     } finally {
       setShowSendModal(false);
       setSelectedIssue(null);
@@ -164,13 +171,36 @@ const VillageAdminDashboard = () => {
       case 'approved': return 'bg-green-100 text-green-800 border-green-300';
       case 'rejected': return 'bg-red-100 text-red-800 border-red-300';
       case 'in-progress': return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'Completed': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
       default: return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
 
+  const openCompletedDetail = (issue) => {
+    setSelectedCompletedIssue(issue);
+    setShowCompletedDetailModal(true);
+  };
+
+  // Image download function
+  const downloadImage = (url, filename = 'proof-photo.jpg') => {
+    fetch(url)
+      .then(response => response.blob())
+      .then(blob => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        notifySuccess('इमेज यशस्वीपणे डाउनलोड झाली!');
+      })
+      .catch(() => notifyError('इमेज डाउनलोड करताना त्रुटी आली'));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
-      {/* NEW GREEN NAVBAR STYLE – तुझ्या screenshot प्रमाणे */}
+      {/* NAVBAR */}
       <div className="bg-gradient-to-r from-green-600 to-emerald-600 shadow-2xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
@@ -183,11 +213,9 @@ const VillageAdminDashboard = () => {
                 <p className="text-green-100 text-lg mt-1">गावातील समस्या व्यवस्थापन करा</p>
               </div>
             </div>
-            {/* Optional: Bell icon with notification badge (तुझ्या screenshot मध्ये red badge आहे) */}
             <div className="relative">
               <div className="bg-white bg-opacity-20 hover:bg-opacity-30 p-4 rounded-full transition-all duration-300 cursor-pointer">
                 <Bell className="w-8 h-8 text-white" />
-                {/* Example badge – तू real count लावू शकतोस */}
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center animate-pulse">
                   4
                 </span>
@@ -197,7 +225,7 @@ const VillageAdminDashboard = () => {
         </div>
       </div>
 
-      {/* Main Content – padding top add केला navbar साठी */}
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-10">
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -258,7 +286,7 @@ const VillageAdminDashboard = () => {
           </h2>
           <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-green-200 transform transition-all duration-300 hover:scale-105 hover:shadow-xl">
             <h3 className="text-2xl font-bold text-green-800 mb-4">एकूण गावातील समस्या</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-5 border-2 border-green-200">
                 <p className="text-green-600 font-semibold mb-1 text-sm uppercase">एकूण समस्या</p>
                 <p className="text-4xl font-bold text-green-900">{stats.total}</p>
@@ -275,8 +303,73 @@ const VillageAdminDashboard = () => {
                 <p className="text-red-600 font-semibold mb-1 text-sm uppercase">नाकारले</p>
                 <p className="text-4xl font-bold text-red-900">{issues.filter(i => i.status === 'rejected').length}</p>
               </div>
+              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-5 border-2 border-emerald-300">
+                <p className="text-emerald-600 font-semibold mb-1 text-sm uppercase">ग्रामसेवक पूर्ण</p>
+                <p className="text-4xl font-bold text-emerald-900">{stats.gramsevakCompleted}</p>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* ग्रामसेवकाने पूर्ण केलेले काम – short list */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-emerald-800 mb-6 flex items-center gap-2">
+            <CheckCircle className="w-7 h-7 text-emerald-600" />
+            ग्रामसेवकाने पूर्ण केलेले काम ({stats.gramsevakCompleted})
+          </h2>
+          {gramsevakCompletedIssues.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-lg p-10 text-center">
+              <CheckCircle className="w-20 h-20 text-emerald-300 mx-auto mb-4" />
+              <p className="text-xl text-emerald-700 font-semibold">
+                अजून ग्रामसेवकाने कोणतेही काम पूर्ण केले नाही
+              </p>
+              <p className="text-emerald-600 mt-2">काम पूर्ण झाल्यावर येथे दिसेल</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {gramsevakCompletedIssues.map((issue) => (
+                <div
+                  key={issue._id}
+                  className="bg-white rounded-xl shadow-md p-5 flex items-center justify-between hover:shadow-lg transition-all duration-200 border border-emerald-200"
+                >
+                  <div className="flex items-center gap-4 flex-1">
+                    {issue.images && issue.images.length > 0 && (
+                      <img 
+                        src={issue.images[0]} 
+                        alt="समस्या" 
+                        className="w-16 h-16 object-cover rounded-lg shadow"
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    )}
+                    <div>
+                      <p className="font-bold text-green-900 text-lg">{issue.type}</p>
+                      <p className="text-green-700 text-sm">{issue.description.substring(0, 80)}{issue.description.length > 80 ? '...' : ''}</p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-green-600">
+                        <span className="flex items-center gap-1">
+                          <Users className="w-4 h-4" />
+                          {issue.assignedTo || 'ग्रामसेवक'}
+                        </span>
+                        <span>मत: {issue.votes?.length || 0}</span>
+                        {issue.proofPhotos && issue.proofPhotos.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Camera className="w-4 h-4" />
+                            पुरावा: {issue.proofPhotos.length}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => openCompletedDetail(issue)}
+                    className="px-5 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-all duration-200 flex items-center gap-2 shadow-md"
+                  >
+                    <Eye className="w-5 h-5" />
+                    पूर्ण माहिती पहा
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Priority Board */}
@@ -392,7 +485,8 @@ const VillageAdminDashboard = () => {
                           {issue.status === 'pending' ? 'प्रलंबित' : 
                            issue.status === 'approved' ? 'मंजूर' :
                            issue.status === 'rejected' ? 'नाकारले' :
-                           issue.status === 'in-progress' ? 'प्रगतीत' : issue.status}
+                           issue.status === 'in-progress' ? 'प्रगतीत' :
+                           issue.status === 'Completed' ? 'पूर्ण' : issue.status}
                         </span>
                       </td>
                       <td className="px-6 py-3">
@@ -453,6 +547,127 @@ const VillageAdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Completed Detail Modal – Best Styling + Download */}
+      {showCompletedDetailModal && selectedCompletedIssue && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-y-auto border-4 border-emerald-500">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-8 py-6 rounded-t-3xl sticky top-0 z-10 shadow-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-3xl font-bold text-white flex items-center gap-3">
+                    <CheckCircle className="w-10 h-10" />
+                    पूर्ण झालेल्या समस्येची सविस्तर माहिती
+                  </h3>
+                  <p className="text-emerald-100 mt-1 text-lg">ग्रामसेवकाने यशस्वीपणे सोडवलेले काम</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowCompletedDetailModal(false);
+                    setSelectedCompletedIssue(null);
+                  }}
+                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-3 transition-all duration-300"
+                >
+                  <XCircle className="w-8 h-8" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-10">
+              {/* Issue Details */}
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 mb-10 border-2 border-emerald-300 shadow-inner">
+                <h4 className="text-3xl font-bold text-green-900 mb-4">{selectedCompletedIssue.type}</h4>
+                <p className="text-green-800 text-lg leading-relaxed mb-6">{selectedCompletedIssue.description}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                  <div className="bg-white rounded-xl p-4 shadow-md">
+                    <p className="text-green-600 text-sm font-semibold">तारीख</p>
+                    <p className="text-green-900 font-bold text-xl">{new Date(selectedCompletedIssue.createdAt).toLocaleDateString('mr-IN')}</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 shadow-md">
+                    <p className="text-green-600 text-sm font-semibold">नियुक्त ग्रामसेवक</p>
+                    <p className="text-green-900 font-bold text-xl">{selectedCompletedIssue.assignedTo || 'ग्रामसेवक'}</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 shadow-md">
+                    <p className="text-green-600 text-sm font-semibold">एकूण मते</p>
+                    <p className="text-green-900 font-bold text-xl">{selectedCompletedIssue.votes?.length || 0}</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 shadow-md">
+                    <p className="text-green-600 text-sm font-semibold">प्राधान्य</p>
+                    <p className={`font-bold text-xl ${selectedCompletedIssue.priority === 'high' ? 'text-red-600' : selectedCompletedIssue.priority === 'medium' ? 'text-yellow-600' : 'text-blue-600'}`}>
+                      {selectedCompletedIssue.priority === 'high' ? 'उच्च' : selectedCompletedIssue.priority === 'medium' ? 'मध्यम' : 'कमी'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Original Problem Images */}
+              {selectedCompletedIssue.images && selectedCompletedIssue.images.length > 0 && (
+                <div className="mb-12">
+                  <h4 className="text-2xl font-bold text-emerald-800 mb-6 flex items-center gap-3">
+                    <Camera className="w-8 h-8" />
+                    मूळ समस्येचे फोटो
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {selectedCompletedIssue.images.map((url, idx) => (
+                      <div key={idx} className="group relative rounded-2xl overflow-hidden shadow-xl border-4 border-green-300">
+                        <img src={url} alt={`मूळ फोटो ${idx + 1}`} className="w-full h-80 object-cover transition-transform duration-500 group-hover:scale-110" />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center">
+                          <button
+                            onClick={() => downloadImage(url, `original-issue-${selectedCompletedIssue._id}-${idx + 1}.jpg`)}
+                            className="opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 bg-white text-green-700 px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg hover:bg-green-100"
+                          >
+                            <Download className="w-6 h-6" />
+                            डाउनलोड
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Proof Photos */}
+              {selectedCompletedIssue.proofPhotos && selectedCompletedIssue.proofPhotos.length > 0 && (
+                <div className="mb-12">
+                  <h4 className="text-2xl font-bold text-emerald-800 mb-6 flex items-center gap-3">
+                    <CheckCircle className="w-8 h-8" />
+                    काम पूर्ण झाल्याचा पुरावा ({selectedCompletedIssue.proofPhotos.length} फोटो)
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {selectedCompletedIssue.proofPhotos.map((url, idx) => (
+                      <div key={idx} className="group relative rounded-2xl overflow-hidden shadow-xl border-4 border-emerald-400">
+                        <img src={url} alt={`पुरावा ${idx + 1}`} className="w-full h-80 object-cover transition-transform duration-500 group-hover:scale-110" />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 flex items-center justify-center">
+                          <button
+                            onClick={() => downloadImage(url, `proof-${selectedCompletedIssue._id}-${idx + 1}.jpg`)}
+                            className="opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 bg-emerald-600 text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg hover:bg-emerald-700"
+                          >
+                            <Download className="w-6 h-6" />
+                            डाउनलोड करा
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Success Banner */}
+              <div className="text-center py-8 bg-gradient-to-r from-emerald-100 to-green-100 rounded-3xl border-4 border-emerald-400">
+                <div className="flex items-center justify-center gap-4">
+                  <CheckCircle className="w-16 h-16 text-emerald-600" />
+                  <p className="text-3xl font-bold text-emerald-900">
+                    हे काम ग्रामसेवकाने यशस्वीपणे पूर्ण केले आहे! 🎉
+                  </p>
+                  <CheckCircle className="w-16 h-16 text-emerald-600" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Send to Gram Sevak Modal */}
       {showSendModal && (
@@ -668,41 +883,7 @@ const VillageAdminDashboard = () => {
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.5s ease-out;
-        }
-
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 10px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-          background: #10b981;
-          border-radius: 10px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-          background: #059669;
-        }
+        .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
       `}</style>
     </div>
   );

@@ -1,8 +1,9 @@
-// routes/issues.js (पूर्ण updated – crash fix + order नीट)
-
+// routes/issues.js
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const multer = require('multer');
+const upload = multer(); // important!
 const { 
   createIssue, 
   getIssues, 
@@ -11,22 +12,22 @@ const {
   approveIssue,
   rejectIssue,
   assignToGramSevak,
-  getAllGramSevakIssues  // <--- हे function आहे आता
+  getAllGramSevakIssues
 } = require('../controllers/issueController');
 
-// 🔥 नवीन route - सर्व GramSevakIssue collection मधील data (admin साठी)
-router.get('/gramsevek', getAllGramSevakIssues); // हे आधी ठेवा!
+const { createGramSevakAssignedIssue,GramSevekStatusUpdate,GetAllGramsevekCompletedIssue } = require('../controllers/gramSevakController'); // correct
 
-// बाकी specific routes
+// Routes
+router.get('/gramsevek', getAllGramSevakIssues);
+router.get('/gramsevek/completed',GetAllGramsevekCompletedIssue)
+router.patch('/gramsevek/:id/approval', createGramSevakAssignedIssue); // multer add केलं file साठी
+router.patch('/gramsevek/:status/:id',GramSevekStatusUpdate)
 router.post('/', auth, createIssue);
 router.get('/', getIssues);
 router.post('/:id/vote', auth, voteIssue);
-
 router.patch('/:id/approved', auth, approveIssue);
 router.patch('/:id/rejected', auth, rejectIssue);
 router.patch('/:id/in-progress', auth, assignToGramSevak);
-
-// 🔥 शेवटी generic route (single issue by ID)
 router.get('/:id', getIssueById);
 
 module.exports = router;

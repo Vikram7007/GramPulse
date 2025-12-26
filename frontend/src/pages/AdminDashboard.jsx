@@ -3,6 +3,10 @@ import { Bell, CheckCircle, XCircle, Flag, ThumbsUp, MessageSquare, Upload, Aler
 import api from '../utils/api';
 import { notifyError, notifySuccess } from '../components/NotificationToast';
 
+// तुझ्या Cloudinary account चे details – बदलून टाक
+const CLOUDINARY_CLOUD_NAME = 'dkwuxbwkn'; // तुझा cloud name
+const CLOUDINARY_UPLOAD_PRESET = 'grampulse_unsigned'; // तुझा unsigned preset
+
 const GramSevakDashboard = () => {
   const [gramSevak] = useState({
     name: 'राजेश कुमार',
@@ -14,22 +18,77 @@ const GramSevakDashboard = () => {
   const [filteredIssues, setFilteredIssues] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Notification state – short मध्ये issue ची मुख्य माहिती दाखवेल
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showCommentModal, setShowCommentModal] = useState(false);
-  const [showProofModal, setShowProofModal] = useState(false);
   const [comment, setComment] = useState('');
-  const [uploadedProof, setUploadedProof] = useState(null);
+  const [issueProofUrls, setIssueProofUrls] = useState({}); // प्रत्येक issue साठी local proof URLs
+  const [uploadingProof, setUploadingProof] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [weekFilter, setWeekFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('all'); // नवीन: टॅब साठी
 
   const newNotificationsCount = notifications.length;
 
-  // Initial data fetch – issues fetch करून short notification तयार करतो
+  // Cloudinary upload function
+  const uploadToCloudinary = async (file) => {
+    if (!file) return null;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    formData.append('folder', 'grampulse/proof');
+
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error?.message || 'Upload failed');
+      }
+
+      const data = await res.json();
+      return data.secure_url;
+    } catch (err) {
+      console.error('Cloudinary upload error:', err);
+      throw err;
+    }
+  };
+
+  // फोटो निवडताक्षण automatic अपलोड होईल (specific issue साठी)
+  const handleProofFileChange = async (e, issueId) => {
+    const files = e.target.files;
+    if (files.length === 0) return;
+
+    setUploadingProof(true);
+    const newUrls = [];
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const url = await uploadToCloudinary(file);
+        newUrls.push(url);
+      }
+      
+      setIssueProofUrls(prev => ({
+        ...prev,
+        [issueId]: [...(prev[issueId] || []), ...newUrls]
+      }));
+      
+      notifySuccess(`${newUrls.length} पुरावा फोटो यशस्वीपणे अपलोड झाले!`);
+    } catch (err) {
+      notifyError('काही फोटो अपलोड करताना त्रुटी');
+    } finally {
+      setUploadingProof(false);
+      e.target.value = ''; // reset input
+    }
+  };
+
   useEffect(() => {
     const fetchAssignedIssues = async () => {
       setLoading(true);
@@ -37,19 +96,17 @@ const GramSevakDashboard = () => {
         const res = await api.get('/issues/gramsevek');
         const fetchedIssues = res.data.issues || [];
 
-        setIssues(fetchedIssues);
+        setIssues(fetchedIssues.map(issue => ({ ...issue, statusChanged: false })));
         setFilteredIssues(fetchedIssues);
 
-        // प्रत्येक issue साठी short notification तयार कर
         if (fetchedIssues.length > 0) {
           const newNotifs = fetchedIssues.map(issue => ({
             id: issue._id,
-            title: issue.type, // मुख्य title
-            preview: issue.description.substring(0, 35) + (issue.description.length > 35 ? '...' : ''), // short preview
+            title: issue.type,
+            preview: issue.description.substring(0, 35) + (issue.description.length > 35 ? '...' : ''),
             priority: issue.priority ? (issue.priority === 'high' ? 'उच्च' : issue.priority === 'medium' ? 'मध्यम' : 'कमी') : '',
             time: new Date(issue.createdAt).toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit' })
           }));
-
           setNotifications(newNotifs);
         }
       } catch (err) {
@@ -63,12 +120,11 @@ const GramSevakDashboard = () => {
     fetchAssignedIssues();
   }, []);
 
-  // Search + Week Filter
   useEffect(() => {
     let filtered = issues;
 
     if (searchQuery.trim()) {
-      filtered = filtered.filter(issue => 
+      filtered = filtered.filter(issue =>
         issue.type.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
@@ -84,7 +140,7 @@ const GramSevakDashboard = () => {
     if (weekFilter === 'thisWeek') {
       filtered = filtered.filter(issue => new Date(issue.createdAt) >= startOfThisWeek);
     } else if (weekFilter === 'lastWeek') {
-      filtered = filtered.filter(issue => 
+      filtered = filtered.filter(issue =>
         new Date(issue.createdAt) >= startOfLastWeek && new Date(issue.createdAt) < startOfThisWeek
       );
     }
@@ -92,9 +148,73 @@ const GramSevakDashboard = () => {
     setFilteredIssues(filtered);
   }, [searchQuery, weekFilter, issues]);
 
+  const handleSubmitUpdate = async (issue) => {
+    if (!issue || !issue._id) {
+      notifyError('समस्या निवडलेली नाही किंवा डेटा हरवला');
+      return;
+    }
+
+    const hasComment = comment.trim().length > 0;
+    const hasProof = issueProofUrls[issue._id] && issueProofUrls[issue._id].length > 0;
+    const hasStatusChange = issue.statusChanged === true;
+
+    if (!hasComment && !hasProof && !hasStatusChange) {
+      notifyError('कृपया काही तरी बदल करा (स्थिती, टिप्पणी किंवा फोटो)');
+      return;
+    }
+
+    // पूर्ण schema नुसार सगळे fields backend ला पाठवतो
+    const payload = {
+      type: issue.type,
+      description: issue.description,
+      location: issue.location || { lat: 0, lng: 0 },
+      images: issue.images || [],
+      votes: issue.votes || [],
+      priority: issue.priority || 'low',
+      assignedTo: issue.assignedTo || gramSevak.name,
+      status: hasStatusChange ? issue.status : (issue.status || 'in-progress'),
+      comments: hasComment 
+        ? [...(issue.comments || []), { 
+            text: comment.trim(), 
+            date: new Date().toLocaleDateString('hi-IN'), 
+            time: new Date().toLocaleTimeString('hi-IN') 
+          }]
+        : (issue.comments || []),
+      proofPhotos: hasProof 
+        ? [...(issue.proofPhotos || []), ...issueProofUrls[issue._id]]
+        : (issue.proofPhotos || []),
+      originalIssueId: issue.originalIssueId || issue._id
+    };
+
+    try {
+      const res = await api.patch(`/issues/gramsevek/${issue._id}/approval`, payload);
+      const ChnageStatus=await api.patch(`/issues/gramsevek/${payload.status}/${issue._id}`)
+      console.log(ChnageStatus)
+      setIssues(prev => prev.map(i =>
+        i._id === issue._id
+          ? { ...i, ...res.data.gramSevakIssue, statusChanged: false }
+          : i
+      ));
+
+      notifySuccess('अपडेट यशस्वी!');
+
+      // Clear local state
+      setIssueProofUrls(prev => {
+        const newState = { ...prev };
+        delete newState[issue._id];
+        return newState;
+      });
+      setComment('');
+    } catch (err) {
+      console.error('Update error:', err.response?.data || err);
+      const errorMsg = err.response?.data?.message || 'अपडेट करताना त्रुटी आली';
+      notifyError(errorMsg);
+    }
+  };
+
   const updateStatus = (issueId, newStatus) => {
-    setIssues(prev => prev.map(issue => 
-      issue._id === issueId ? { ...issue, status: newStatus } : issue
+    setIssues(prev => prev.map(issue =>
+      issue._id === issueId ? { ...issue, status: newStatus, statusChanged: true } : issue
     ));
   };
 
@@ -105,9 +225,9 @@ const GramSevakDashboard = () => {
         date: new Date().toLocaleDateString('hi-IN'),
         time: new Date().toLocaleTimeString('hi-IN')
       };
-      setIssues(prev => prev.map(issue => 
-        issue._id === selectedIssue._id 
-          ? { ...issue, comments: [...(issue.comments || []), newComment] } 
+      setIssues(prev => prev.map(issue =>
+        issue._id === selectedIssue._id
+          ? { ...issue, comments: [...(issue.comments || []), newComment] }
           : issue
       ));
       setComment('');
@@ -115,17 +235,11 @@ const GramSevakDashboard = () => {
     }
   };
 
-  const uploadProof = () => {
-    if (uploadedProof && selectedIssue) {
-      setIssues(prev => prev.map(issue => 
-        issue._id === selectedIssue._id 
-          ? { ...issue, proofPhoto: uploadedProof.name, status: 'Completed' } 
-          : issue
-      ));
-      setUploadedProof(null);
-      setShowProofModal(false);
-      setSelectedIssue(null);
-    }
+  const removeProofPhoto = (issueId, index) => {
+    setIssueProofUrls(prev => ({
+      ...prev,
+      [issueId]: (prev[issueId] || []).filter((_, i) => i !== index)
+    }));
   };
 
   const getPriorityColor = (priority) => {
@@ -153,6 +267,16 @@ const GramSevakDashboard = () => {
     totalVotes: filteredIssues.reduce((sum, issue) => sum + (issue.votes?.length || 0), 0)
   };
 
+  // टॅब नुसार issues फिल्टर करा
+  const displayedIssues = activeTab === 'all' 
+    ? filteredIssues 
+    : filteredIssues.filter(issue => {
+        if (activeTab === 'pending') return issue.status === 'in-progress';
+        if (activeTab === 'completed') return issue.status === 'Completed';
+        if (activeTab === 'rejected') return issue.status === 'Issue';
+        return true;
+      });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
       {/* Header */}
@@ -177,7 +301,6 @@ const GramSevakDashboard = () => {
               <button
                 onClick={() => {
                   setShowNotifications(!showNotifications);
-                  // Bell click केल्यावर notification clear कर (red dot जाऊ दे)
                   setNotifications([]);
                 }}
                 className="relative bg-white bg-opacity-20 hover:bg-opacity-30 p-3 rounded-full transition-all duration-300 transform hover:scale-110"
@@ -189,7 +312,6 @@ const GramSevakDashboard = () => {
                   </span>
                 )}
               </button>
-
               {showNotifications && (
                 <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl overflow-hidden animate-slideDown z-50">
                   <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-5 py-3">
@@ -232,7 +354,6 @@ const GramSevakDashboard = () => {
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl animate-fadeIn" style={{animationDelay: '0.1s'}}>
             <div className="flex items-center justify-between">
               <div>
@@ -244,7 +365,6 @@ const GramSevakDashboard = () => {
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-emerald-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl animate-fadeIn" style={{animationDelay: '0.2s'}}>
             <div className="flex items-center justify-between">
               <div>
@@ -256,7 +376,6 @@ const GramSevakDashboard = () => {
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-orange-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl animate-fadeIn" style={{animationDelay: '0.3s'}}>
             <div className="flex items-center justify-between">
               <div>
@@ -283,7 +402,6 @@ const GramSevakDashboard = () => {
                 className="w-full pl-12 pr-4 py-3 border-2 border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-green-900"
               />
             </div>
-
             <div className="flex items-center gap-3">
               <Filter className="w-5 h-5 text-green-600" />
               <select
@@ -299,31 +417,73 @@ const GramSevakDashboard = () => {
           </div>
         </div>
 
-        {/* Issues Grid */}
+        {/* Simple 3 Buttons for Category Tabs */}
+        <div className="mb-6 flex justify-center gap-4">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+              activeTab === 'all' 
+                ? 'bg-green-600 text-white shadow-lg' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            सर्व ({filteredIssues.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+              activeTab === 'pending' 
+                ? 'bg-blue-600 text-white shadow-lg' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            प्रगतीत ({stats.inProgress})
+          </button>
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+              activeTab === 'completed' 
+                ? 'bg-emerald-600 text-white shadow-lg' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            पूर्ण ({stats.completed})
+          </button>
+          <button
+            onClick={() => setActiveTab('rejected')}
+            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+              activeTab === 'rejected' 
+                ? 'bg-red-600 text-white shadow-lg' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            अडचण ({filteredIssues.filter(i => i.status === 'Issue').length})
+          </button>
+        </div>
+
+        {/* Issues Grid – एकच grid, फक्त फिल्टर केलेले cards */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-green-800 mb-6 flex items-center gap-2">
             <FileText className="w-7 h-7" />
-            नियुक्त समस्या ({filteredIssues.length})
+            नियुक्त समस्या ({displayedIssues.length})
           </h2>
-
           {loading ? (
             <div className="text-center py-20">
               <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-green-600 mx-auto"></div>
               <p className="mt-6 text-green-700 text-xl">समस्यांची यादी लोड होत आहे...</p>
             </div>
-          ) : filteredIssues.length === 0 ? (
+          ) : displayedIssues.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-2xl shadow-lg">
               <FileText className="w-20 h-20 text-green-300 mx-auto mb-4" />
               <p className="text-2xl text-green-700 font-semibold">
-                सध्या कोणतीही समस्या नियुक्त नाही 😊
+                या श्रेणीमध्ये सध्या कोणतीही समस्या नाही
               </p>
-              <p className="text-green-600 mt-2">नवीन समस्या आल्यावर येथे दिसतील</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {filteredIssues.map((issue, index) => (
-                <div 
-                  key={issue._id} 
+              {displayedIssues.map((issue, index) => (
+                <div
+                  key={issue._id}
                   className="bg-white rounded-2xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-102 hover:shadow-2xl border-2 border-green-100"
                   style={{animation: `slideUp 0.5s ease-out ${index * 0.15}s both`}}
                 >
@@ -346,11 +506,9 @@ const GramSevakDashboard = () => {
                       </span>
                     </div>
                   </div>
-
                   {/* Issue Body */}
                   <div className="p-6">
                     <p className="text-green-900 text-base mb-4 leading-relaxed">{issue.description}</p>
-
                     {/* Photo & Map Section */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="bg-green-50 rounded-xl p-4 border-2 border-green-200">
@@ -359,9 +517,9 @@ const GramSevakDashboard = () => {
                           <span className="text-green-700 font-semibold text-sm">समस्येचा फोटो</span>
                         </div>
                         {issue.images && issue.images.length > 0 ? (
-                          <img 
-                            src={issue.images[0]} 
-                            alt="Problem" 
+                          <img
+                            src={issue.images[0]}
+                            alt="Problem"
                             className="w-full h-32 object-cover rounded-lg shadow"
                             onError={(e) => e.target.style.display = 'none'}
                           />
@@ -381,7 +539,6 @@ const GramSevakDashboard = () => {
                         </div>
                       </div>
                     </div>
-
                     {/* Status Indicator */}
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-2">
@@ -391,7 +548,6 @@ const GramSevakDashboard = () => {
                         </span>
                       </div>
                     </div>
-
                     {/* Comments Display */}
                     {(issue.comments || []).length > 0 && (
                       <div className="mb-4 bg-green-50 rounded-xl p-4 border-2 border-green-200">
@@ -409,6 +565,33 @@ const GramSevakDashboard = () => {
                         </div>
                       </div>
                     )}
+                    
+                    {/* Uploaded Proof Photos Display */}
+                    {issueProofUrls[issue._id] && issueProofUrls[issue._id].length > 0 && (
+                      <div className="mb-4 bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
+                        <h4 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                          <Camera className="w-4 h-4" />
+                          अपलोड केलेले पुरावा फोटो ({issueProofUrls[issue._id].length})
+                        </h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          {issueProofUrls[issue._id].map((url, idx) => (
+                            <div key={idx} className="relative group">
+                              <img
+                                src={url}
+                                alt={`पुरावा ${idx + 1}`}
+                                className="w-full h-24 object-cover rounded-lg shadow"
+                              />
+                              <button
+                                onClick={() => removeProofPhoto(issue._id, idx)}
+                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="space-y-3">
@@ -416,8 +599,8 @@ const GramSevakDashboard = () => {
                         <button
                           onClick={() => updateStatus(issue._id, 'in-progress')}
                           className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
-                            issue.status === 'in-progress' 
-                              ? 'bg-blue-500 text-white shadow-lg' 
+                            issue.status === 'in-progress'
+                              ? 'bg-blue-500 text-white shadow-lg'
                               : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                           }`}
                         >
@@ -427,8 +610,8 @@ const GramSevakDashboard = () => {
                         <button
                           onClick={() => updateStatus(issue._id, 'Completed')}
                           className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
-                            issue.status === 'Completed' 
-                              ? 'bg-green-500 text-white shadow-lg' 
+                            issue.status === 'Completed'
+                              ? 'bg-green-500 text-white shadow-lg'
                               : 'bg-green-100 text-green-700 hover:bg-green-200'
                           }`}
                         >
@@ -438,8 +621,8 @@ const GramSevakDashboard = () => {
                         <button
                           onClick={() => updateStatus(issue._id, 'Issue')}
                           className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
-                            issue.status === 'Issue' 
-                              ? 'bg-red-500 text-white shadow-lg' 
+                            issue.status === 'Issue'
+                              ? 'bg-red-500 text-white shadow-lg'
                               : 'bg-red-100 text-red-700 hover:bg-red-200'
                           }`}
                         >
@@ -447,7 +630,6 @@ const GramSevakDashboard = () => {
                           अडचण
                         </button>
                       </div>
-
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           onClick={() => {
@@ -459,26 +641,29 @@ const GramSevakDashboard = () => {
                           <MessageSquare className="w-4 h-4" />
                           टिप्पणी जोडा
                         </button>
-                        <button
-                          onClick={() => {
-                            setSelectedIssue(issue);
-                            setShowProofModal(true);
-                          }}
-                          className="px-4 py-3 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 shadow-md"
-                        >
+                        
+                        {/* Upload Button */}
+                        <label className="px-4 py-3 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 shadow-md cursor-pointer">
                           <Upload className="w-4 h-4" />
-                          पुरावा अपलोड
-                        </button>
+                          {uploadingProof ? 'अपलोड होत आहे...' : 'पुरावा अपलोड'}
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={(e) => handleProofFileChange(e, issue._id)}
+                            className="hidden"
+                            disabled={uploadingProof}
+                          />
+                        </label>
                       </div>
+                      <button
+                        onClick={() => handleSubmitUpdate(issue)}
+                        className="w-full mt-4 px-6 py-3 bg-green-600 text-white rounded-xl font-bold text-base hover:bg-green-700 transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle className="w-6 h-6" />
+                        अपडेट सबमिट करा
+                      </button>
                     </div>
-
-                    {/* Proof Uploaded Indicator */}
-                    {issue.proofPhoto && (
-                      <div className="mt-4 bg-green-100 border-2 border-green-300 rounded-xl p-3 flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        <span className="text-green-800 font-semibold text-sm">पुरावा अपलोड झाला: {issue.proofPhoto}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
@@ -507,13 +692,11 @@ const GramSevakDashboard = () => {
                 <XCircle className="w-6 h-6" />
               </button>
             </div>
-            
             <div className="p-6">
               <div className="mb-5 bg-green-50 rounded-xl p-4 border-2 border-green-200">
                 <h4 className="font-bold text-green-900 text-lg mb-2">{selectedIssue?.type}</h4>
                 <p className="text-green-700 text-sm">{selectedIssue?.description}</p>
               </div>
-
               <label className="block text-green-800 font-semibold mb-3 text-base">
                 आजचे काम / प्रगती
               </label>
@@ -523,7 +706,6 @@ const GramSevakDashboard = () => {
                 placeholder="आज काय काम केले ते येथे लिहा..."
                 className="w-full h-40 px-4 py-3 border-2 border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-green-900 resize-none"
               />
-              
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={addComment}
@@ -549,80 +731,11 @@ const GramSevakDashboard = () => {
         </div>
       )}
 
-      {/* Proof Upload Modal */}
-      {showProofModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full transform transition-all duration-300 scale-100">
-            <div className="bg-gradient-to-r from-orange-600 to-orange-500 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Upload className="w-6 h-6" />
-                कामाचा पुरावा अपलोड करा
-              </h3>
-              <button
-                onClick={() => {
-                  setShowProofModal(false);
-                  setUploadedProof(null);
-                  setSelectedIssue(null);
-                }}
-                className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all duration-200"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="p-6">
-              <div className="mb-5 bg-green-50 rounded-xl p-4 border-2 border-green-200">
-                <h4 className="font-bold text-green-900 text-lg mb-2">{selectedIssue?.type}</h4>
-                <p className="text-green-700 text-sm">{selectedIssue?.description}</p>
-              </div>
-
-              <div className="border-3 border-dashed border-orange-300 rounded-xl p-10 text-center mb-5 bg-orange-50 hover:bg-orange-100 transition-colors duration-200">
-                <Camera className="w-16 h-16 text-orange-600 mx-auto mb-4" />
-                <label className="cursor-pointer">
-                  <span className="text-orange-700 font-semibold text-lg block mb-2">
-                    {uploadedProof ? uploadedProof.name : 'पूर्ण झालेल्या कामाचा फोटो निवडा'}
-                  </span>
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => setUploadedProof(e.target.files[0])}
-                    accept="image/*"
-                  />
-                  <span className="text-orange-600 text-sm">पूर्ण झालेल्या कामाचे फोटो अपलोड करा</span>
-                </label>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={uploadProof}
-                  disabled={!uploadedProof}
-                  className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 flex items-center justify-center gap-2"
-                >
-                  <Upload className="w-5 h-5" />
-                  अपलोड करा
-                </button>
-                <button
-                  onClick={() => {
-                    setShowProofModal(false);
-                    setUploadedProof(null);
-                    setSelectedIssue(null);
-                  }}
-                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-all duration-200"
-                >
-                  रद्द करा
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        
         @keyframes slideUp {
           from {
             opacity: 0;
@@ -633,7 +746,6 @@ const GramSevakDashboard = () => {
             transform: translateY(0);
           }
         }
-
         @keyframes slideDown {
           from {
             opacity: 0;
@@ -644,31 +756,24 @@ const GramSevakDashboard = () => {
             transform: translateY(0);
           }
         }
-        
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-out both;
         }
-
         .animate-slideDown {
           animation: slideDown 0.3s ease-out;
         }
-
-        /* Custom scrollbar */
         ::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
-        
         ::-webkit-scrollbar-track {
           background: #f1f1f1;
           border-radius: 10px;
         }
-        
         ::-webkit-scrollbar-thumb {
           background: #10b981;
           border-radius: 10px;
         }
-        
         ::-webkit-scrollbar-thumb:hover {
           background: #059669;
         }

@@ -3,6 +3,7 @@
 const Issue = require('../models/Issue');
 const GramSevakIssue = require('../models/GramSevakIssue');
 
+
 // Create new issue
 exports.createIssue = async (req, res) => {
   const { type, description, location, images } = req.body;
@@ -210,11 +211,14 @@ if (io) {
 // Get all GramSevakIssue data (used for /gramsevek endpoint)
 exports.getAllGramSevakIssues = async (req, res) => {
   try {
+      console.log("viki lale")
     const issues = await GramSevakIssue.find()
       .populate('submittedBy', 'name mobile village')
       .sort({ createdAt: -1 })
       .lean();
-
+   
+     console.log(issues);
+     
     const stats = {
       total: issues.length,
       inProgress: issues.filter(i => i.status === 'in-progress').length,
@@ -236,3 +240,9 @@ exports.getAllGramSevakIssues = async (req, res) => {
     });
   }
 };
+
+
+
+// controllers/gramSevakController.js
+
+
