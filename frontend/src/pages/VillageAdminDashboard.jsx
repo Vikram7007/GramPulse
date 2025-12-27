@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle, XCircle, Flag, Users, MapPin, Calendar, FileText, ChevronDown, AlertTriangle, TrendingUp, Send, Eye, Camera, Download } from 'lucide-react';
 import api from '../utils/api';
 import { notifyError, notifySuccess } from '../components/NotificationToast';
-
+import ReturnToDashboard from './ReturnToDashboard';
 const VillageAdminDashboard = () => {
   const [issues, setIssues] = useState([]);
   const [gramsevakCompletedIssues, setGramsevakCompletedIssues] = useState([]);
@@ -23,6 +23,7 @@ const VillageAdminDashboard = () => {
     'प्रिया देवी',
     'रमेश सिंह'
   ];
+
 
   // मुख्य issues fetch
   useEffect(() => {
@@ -201,8 +202,10 @@ const VillageAdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
       {/* NAVBAR */}
+      
       <div className="bg-gradient-to-r from-green-600 to-emerald-600 shadow-2xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-5">
+          
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-5">
               <div className="bg-white rounded-full p-4 shadow-lg">
@@ -225,9 +228,11 @@ const VillageAdminDashboard = () => {
         </div>
       </div>
 
+    
+      <ReturnToDashboard/>
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        {/* Stats Overview */}
+      <div className="max-w-7xl mx-auto mt-10 px-6 py-10">
+      
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-orange-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl">
             <div className="flex items-center justify-between">

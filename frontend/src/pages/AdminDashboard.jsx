@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle, XCircle, Flag, ThumbsUp, MessageSquare, Upload, AlertCircle, Clock, Camera, FileText, User, TrendingUp, Award, MapPin, Calendar, Search, Filter } from 'lucide-react';
 import api from '../utils/api';
 import { notifyError, notifySuccess } from '../components/NotificationToast';
-
+import ReturnToDashboard from './ReturnToDashboard'
+      
 // तुझ्या Cloudinary account चे details – बदलून टाक
 const CLOUDINARY_CLOUD_NAME = 'dkwuxbwkn'; // तुझा cloud name
 const CLOUDINARY_UPLOAD_PRESET = 'grampulse_unsigned'; // तुझा unsigned preset
@@ -339,9 +340,11 @@ const GramSevakDashboard = () => {
           </div>
         </div>
       </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-8">
+ <ReturnToDashboard/>
+      <div className="max-w-7xl mx-auto mt-10 px-6 py-8">
         {/* Stats Cards */}
+        
+             
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-green-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl animate-fadeIn">
             <div className="flex items-center justify-between">
