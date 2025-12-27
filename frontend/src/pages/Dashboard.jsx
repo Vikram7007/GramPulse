@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import IssueCard from '../components/IssueCard';
 import Navbar from '../components/Navbar';
@@ -7,17 +7,13 @@ import api from '../utils/api';
 import { notifyError } from '../components/NotificationToast';
 import SubmitIssue from './SubmitIssue';
 
-
-
-
-
 function Dashboard() {
   const [issues, setIssues] = useState([]);
-  const [allIssues, setAllIssues] = useState([]); // सगळे issues save ठेव
+  const [allIssues, setAllIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedWeek, setSelectedWeek] = useState('current');
+  const [activeTab, setActiveTab] = useState('all');
 
-  // Generate week options (last 8 weeks)
   const getWeekOptions = () => {
     const options = [{ value: 'current', label: 'सध्याचा आठवडा' }];
     const today = new Date();
@@ -34,7 +30,6 @@ function Dashboard() {
 
   const weekOptions = getWeekOptions();
 
-  // Fetch all issues once
   useEffect(() => {
     const fetchIssues = async () => {
       setLoading(true);
@@ -42,7 +37,7 @@ function Dashboard() {
         const res = await api.get('/issues');
         const fetchedIssues = res.data.issues || [];
         setAllIssues(fetchedIssues);
-        setIssues(fetchedIssues); // initial all
+        setIssues(fetchedIssues);
       } catch (err) {
         console.error('Fetch issues error:', err);
         notifyError('समस्या लोड करताना त्रुटी');
@@ -54,7 +49,6 @@ function Dashboard() {
     fetchIssues();
   }, []);
 
-  // Filter issues when week changes
   useEffect(() => {
     if (allIssues.length === 0) return;
 
@@ -81,60 +75,74 @@ function Dashboard() {
     setIssues(filtered);
   }, [selectedWeek, allIssues]);
 
+  const stats = {
+    all: issues.length,
+    inProgress: issues.filter(i => i.status === 'in-progress').length,
+    completed: issues.filter(i => i.status === 'approved').length,
+    issue: issues.filter(i => i.status === 'rejected').length
+  };
+
+  const displayedIssues = activeTab === 'all' 
+    ? issues 
+    : issues.filter(issue => {
+        if (activeTab === 'inProgress') return issue.status === 'in-progress';
+        if (activeTab === 'approved') return issue.status === 'approved';
+        if (activeTab === 'rejected') return issue.status === 'rejected';
+        return true;
+      });
+
   return (
     <>
       <Navbar />
       <Sidebar />
 
-      {/* ✨ ENHANCED: Main container with premium gradient background and improved spacing */}
-      <div className="pt-28 pb-32 pl-0 md:pl-64 px-4 sm:px-6 lg:px-8 min-h-screen bg-gradient-to-br from-emerald-50/80 via-green-50/60 to-teal-50/80 relative overflow-hidden">
+      <div className="pt-28 pb-32 pl-0 md:pl-64 px-4 sm:px-6 lg:px-8 min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 relative overflow-hidden">
         
-        {/* ✨ ENHANCED: Subtle background decoration */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(16,185,129,0.05),transparent_50%),radial-gradient(circle_at_70%_60%,rgba(20,184,166,0.05),transparent_50%)] pointer-events-none"></div>
+        <div className="absolute inset-0 opacity-40">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-green-300/30 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-300/30 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
+          <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-teal-300/30 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+        </div>
         
         <div className="relative z-10" style={{ paddingLeft: "240px" }}>
 
-          {/* ✨ ENHANCED: Premium header with improved typography and animations */}
-          <div className="max-w-7xl mx-auto mb-12 text-center">
-            <div className="inline-block mb-6">
-              <h1 className="text-4xl  sm:text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent tracking-tight leading-tight animate-[fadeIn_0.8s_ease-out]">
+          <div className="max-w-7xl mx-auto mb-16 text-center">
+            <div className="relative inline-block mb-8">
+              <div className="absolute -inset-4 bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 opacity-20 blur-2xl rounded-full animate-pulse"></div>
+              <h1 className="relative text-5xl sm:text-6xl md:text-7xl font-black mb-3 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent tracking-tight leading-tight filter drop-shadow-lg">
                 गावातील समस्या
               </h1>
-              {/* ✨ ENHANCED: Elegant decorative line with gradient */}
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className="w-12 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/50 to-emerald-400 rounded-full"></div>
-                <div className="w-20 h-[3px] bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-full shadow-sm"></div>
-                <div className="w-12 h-[2px] bg-gradient-to-r from-teal-400 via-teal-400/50 to-transparent rounded-full"></div>
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <div className="h-1 w-20 bg-gradient-to-r from-transparent via-green-400 to-green-500 rounded-full shadow-lg"></div>
+                <div className="h-2 w-32 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 rounded-full shadow-xl"></div>
+                <div className="h-1 w-20 bg-gradient-to-r from-teal-500 via-teal-400 to-transparent rounded-full shadow-lg"></div>
               </div>
             </div>
-            {/* ✨ ENHANCED: Improved subtitle with better contrast */}
-            <p className="text-base sm:text-lg md:text-xl text-gray-600 font-medium max-w-2xl mx-auto leading-relaxed animate-[fadeIn_1s_ease-out]">
+            <p className="text-xl sm:text-2xl text-gray-700 font-semibold max-w-3xl mx-auto leading-relaxed tracking-wide">
               आपल्या गावाच्या विकासासाठी आवाज उठवा
             </p>
           </div>
 
-          {/* ✨ ENHANCED: Premium dropdown with glass morphism effect */}
-          <div className="max-w-xl mx-auto mb-14 px-4">
-            <label className="block text-base sm:text-lg font-semibold text-gray-700 mb-3 text-center tracking-wide">
-              आठवडा निवडा
+          <div className="max-w-2xl mx-auto mb-14 px-4">
+            <label className="block text-lg font-bold text-gray-800 mb-4 text-center tracking-wide">
+              📅 आठवडा निवडा
             </label>
             <div className="relative group">
-              {/* ✨ ENHANCED: Glow effect on focus */}
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-2xl opacity-0 group-focus-within:opacity-20 blur-lg transition-all duration-500"></div>
+              <div className="absolute -inset-1 bg-gradient-to-r from-green-400 to-teal-400 rounded-2xl opacity-30 group-hover:opacity-50 blur-xl transition-all duration-500"></div>
               <select
                 value={selectedWeek}
                 onChange={(e) => setSelectedWeek(e.target.value)}
-                className="relative w-full p-4 sm:p-5 border-2 border-emerald-200/60 rounded-xl sm:rounded-2xl text-base sm:text-lg font-medium text-gray-700 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 focus:outline-none transition-all duration-300 shadow-sm hover:shadow-lg hover:border-emerald-300 bg-white/80 backdrop-blur-sm appearance-none cursor-pointer"
+                className="relative w-full px-6 py-5 bg-white/90 backdrop-blur-md border-3 border-green-300 rounded-2xl text-lg font-bold text-gray-800 shadow-xl hover:shadow-2xl focus:shadow-2xl focus:border-green-500 focus:ring-4 focus:ring-green-200 focus:outline-none transition-all duration-300 cursor-pointer appearance-none hover:scale-[1.02] active:scale-[0.98]"
                 style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310b981'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310b981'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                   backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 1rem center',
-                  backgroundSize: '1.5em 1.5em',
-                  paddingRight: '3rem'
+                  backgroundPosition: 'right 1.5rem center',
+                  backgroundSize: '2em 2em',
+                  paddingRight: '4rem'
                 }}
               >
                 {weekOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value} className="py-2">
+                  <option key={opt.value} value={opt.value} className="py-3 font-semibold">
                     {opt.label}
                   </option>
                 ))}
@@ -142,48 +150,121 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* ✨ ENHANCED: Premium loading state with smooth animation */}
+          <div className="max-w-6xl mx-auto mb-16 px-4">
+            <div className="relative bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-green-200/50">
+              <div className="absolute -top-3 -right-3 w-24 h-24 bg-green-400/20 rounded-full blur-2xl"></div>
+              <div className="absolute -bottom-3 -left-3 w-24 h-24 bg-teal-400/20 rounded-full blur-2xl"></div>
+              
+              <div className="relative flex flex-wrap justify-center gap-5">
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={`relative px-12 py-5 rounded-2xl font-extrabold text-lg tracking-wide transition-all duration-300 transform hover:scale-110 active:scale-95 ${
+                    activeTab === 'all'
+                      ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-2xl shadow-green-400/60'
+                      : 'bg-white/90 text-green-700 hover:bg-green-100 border-3 border-green-300 shadow-lg hover:shadow-xl'
+                  }`}
+                >
+                  {activeTab === 'all' && (
+                    <div className="absolute inset-0 rounded-2xl bg-white/30 animate-ping"></div>
+                  )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    📋 सर्व <span className="text-2xl">({stats.all})</span>
+                  </span>
+                </button>
+                
+                <button
+                  onClick={() => setActiveTab('inProgress')}
+                  className={`relative px-12 py-5 rounded-2xl font-extrabold text-lg tracking-wide transition-all duration-300 transform hover:scale-110 active:scale-95 ${
+                    activeTab === 'inProgress'
+                      ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-2xl shadow-blue-400/60'
+                      : 'bg-white/90 text-blue-700 hover:bg-blue-100 border-3 border-blue-300 shadow-lg hover:shadow-xl'
+                  }`}
+                >
+                  {activeTab === 'inProgress' && (
+                    <div className="absolute inset-0 rounded-2xl bg-white/30 animate-ping"></div>
+                  )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    ⏳ प्रगतीत <span className="text-2xl">({stats.inProgress})</span>
+                  </span>
+                </button>
+                
+                <button
+                  onClick={() => setActiveTab('approved')}
+                  className={`relative px-12 py-5 rounded-2xl font-extrabold text-lg tracking-wide transition-all duration-300 transform hover:scale-110 active:scale-95 ${
+                    activeTab === 'approved'
+                      ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-2xl shadow-emerald-400/60'
+                      : 'bg-white/90 text-emerald-700 hover:bg-emerald-100 border-3 border-emerald-300 shadow-lg hover:shadow-xl'
+                  }`}
+                >
+                  {activeTab === 'approved' && (
+                    <div className="absolute inset-0 rounded-2xl bg-white/30 animate-ping"></div>
+                  )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    ✅ पूर्ण <span className="text-2xl">({stats.completed})</span>
+                  </span>
+                </button>
+                
+                <button
+                  onClick={() => setActiveTab('rejected')}
+                  className={`relative px-12 py-5 rounded-2xl font-extrabold text-lg tracking-wide transition-all duration-300 transform hover:scale-110 active:scale-95 ${
+                    activeTab === 'rejected'
+                      ? 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-2xl shadow-red-400/60'
+                      : 'bg-white/90 text-red-700 hover:bg-red-100 border-3 border-red-300 shadow-lg hover:shadow-xl'
+                  }`}
+                >
+                  {activeTab === 'rejected' && (
+                    <div className="absolute inset-0 rounded-2xl bg-white/30 animate-ping"></div>
+                  )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    ⚠️ अडचण <span className="text-2xl">({stats.issue})</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {loading ? (
-            <div className="text-center py-24 sm:py-32">
+            <div className="text-center py-32">
               <div className="relative inline-block">
-                {/* ✨ ENHANCED: Multi-layered spinner with glow */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 opacity-20 blur-xl animate-pulse"></div>
-                <div className="relative animate-spin rounded-full h-16 w-16 sm:h-20 sm:w-20 border-4 border-gray-200">
-                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 border-r-green-500"></div>
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 opacity-40 blur-3xl animate-pulse"></div>
+                <div className="relative">
+                  <div className="animate-spin rounded-full h-28 w-28 border-8 border-gray-200 border-t-green-500 border-r-emerald-500 shadow-2xl"></div>
+                  <div className="absolute inset-0 rounded-full border-8 border-transparent border-b-teal-500 animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
                 </div>
               </div>
-              <p className="mt-8 text-gray-600 text-lg sm:text-xl font-medium animate-pulse">समस्या लोड होत आहेत...</p>
+              <p className="mt-12 text-gray-700 text-2xl font-bold animate-pulse tracking-wide">समस्या लोड होत आहेत...</p>
             </div>
-          ) : issues.length === 0 ? (
-            /* ✨ ENHANCED: Premium empty state with card design */
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-white/60 backdrop-blur-sm rounded-3xl shadow-xl border border-emerald-100/50 p-12 sm:p-16 text-center transform transition-all duration-500 hover:shadow-2xl hover:scale-[1.02]">
-                {/* ✨ ENHANCED: Animated emoji with gradient background */}
-                <div className="inline-flex items-center justify-center w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-emerald-100 via-green-100 to-teal-100 mb-6 shadow-inner">
-                  <div className="text-5xl sm:text-6xl animate-[bounce_2s_ease-in-out_infinite]">😔</div>
+          ) : displayedIssues.length === 0 ? (
+            <div className="max-w-3xl mx-auto">
+              <div className="relative bg-gradient-to-br from-white via-green-50/50 to-emerald-50/50 backdrop-blur-xl rounded-3xl shadow-2xl border-3 border-green-200 p-20 text-center transform transition-all duration-500 hover:scale-105 hover:shadow-3xl">
+                <div className="absolute -top-6 -right-6 w-40 h-40 bg-green-300/30 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute -bottom-6 -left-6 w-40 h-40 bg-teal-300/30 rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
+                
+                <div className="relative inline-flex items-center justify-center w-40 h-40 rounded-full bg-gradient-to-br from-green-100 via-emerald-100 to-teal-100 mb-10 shadow-2xl border-4 border-white">
+                  <div className="text-8xl animate-bounce">😔</div>
                 </div>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3 tracking-tight">या आठवड्यात कोणतीही समस्या नाही</p>
-                <p className="text-base sm:text-lg text-gray-600 leading-relaxed">नवीन समस्या नोंदवा आणि गावाला मदत करा!</p>
-                {/* ✨ ENHANCED: Decorative line */}
-                <div className="mt-6 w-24 h-1 bg-gradient-to-r from-emerald-300 via-green-300 to-teal-300 rounded-full mx-auto"></div>
+                <p className="text-4xl font-black text-gray-800 mb-5 tracking-tight leading-tight">या श्रेणीमध्ये कोणतीही समस्या नाही</p>
+                <p className="text-xl text-gray-600 leading-relaxed font-semibold">नवीन समस्या नोंदवा आणि गावाला मदत करा!</p>
+                <div className="mt-10 h-2 w-40 bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 rounded-full mx-auto shadow-xl"></div>
               </div>
             </div>
           ) : (
-            /* ✨ ENHANCED: Premium issues grid with staggered animation */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-7xl mx-auto px-2">
-              {issues.map((issue, index) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10 max-w-7xl mx-auto px-2">
+              {displayedIssues.map((issue, index) => (
                 <div
                   key={issue._id}
-                  className="group transform transition-all duration-500 hover:scale-[1.03] hover:z-20"
+                  className="group"
                   style={{
-                    animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`
+                    animation: `cardFloat 0.8s ease-out ${index * 0.15}s both`
                   }}
                 >
-                  {/* ✨ ENHANCED: Glow effect on hover */}
-                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-2xl opacity-0 group-hover:opacity-30 blur-xl transition-all duration-500 group-hover:duration-300"></div>
+                  <div className="absolute -inset-3 bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 rounded-3xl opacity-0 group-hover:opacity-50 blur-2xl transition-all duration-500"></div>
                   
                   <Link to={`/issue-details/${issue._id}`} className="relative block">
-                    <div className="relative overflow-hidden rounded-2xl shadow-lg group-hover:shadow-2xl transition-all duration-500 bg-white/80 backdrop-blur-sm border border-emerald-100/50 group-hover:border-emerald-200">
+                    <div className="relative overflow-hidden rounded-3xl shadow-xl group-hover:shadow-3xl transition-all duration-500 bg-white/95 backdrop-blur-sm border-3 border-green-200 group-hover:border-green-400 transform group-hover:-translate-y-3 group-hover:scale-105">
+                      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500"></div>
+                      <div className="absolute -top-20 -right-20 w-40 h-40 bg-green-300/20 rounded-full blur-3xl group-hover:blur-2xl transition-all duration-500"></div>
+                      
                       <IssueCard
                         issue={{
                           _id: issue._id,
@@ -203,47 +284,64 @@ function Dashboard() {
             </div>
           )}
 
-          {/* ✨ ENHANCED: Premium floating action button with advanced effects */}
           <Link to="/submit">
             <button
-              className="group fixed bottom-6 right-6 sm:bottom-8 sm:right-8 w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white rounded-full shadow-2xl hover:shadow-emerald-400/60 flex items-center justify-center text-3xl sm:text-4xl font-light transition-all duration-500 hover:scale-110 hover:rotate-90 z-50 border-4 border-white/20"
+              className="group fixed bottom-8 right-8 w-24 h-24 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 text-white rounded-full shadow-2xl hover:shadow-green-400/80 flex items-center justify-center text-5xl font-light transition-all duration-500 hover:scale-125 hover:rotate-180 z-50 border-4 border-white backdrop-blur-sm"
               aria-label="Add new issue"
             >
-              {/* ✨ ENHANCED: Multi-layer glow effect */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400 to-teal-400 opacity-0 group-hover:opacity-50 blur-2xl transition-opacity duration-500 animate-pulse group-hover:animate-none"></div>
-              <div className="absolute inset-0 rounded-full bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-300 to-teal-300 opacity-0 group-hover:opacity-70 blur-3xl transition-opacity duration-500 animate-pulse"></div>
+              <div className="absolute inset-0 rounded-full bg-white opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
               
-              <span className="relative z-10 transition-transform duration-300 group-hover:rotate-0 font-extralight">+</span>
+              <span className="relative z-10 font-thin">+</span>
               
-              {/* ✨ ENHANCED: Ripple effect on hover */}
-              <div className="absolute inset-0 rounded-full border-2 border-white/40 scale-100 group-hover:scale-150 opacity-100 group-hover:opacity-0 transition-all duration-700"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-white/60 scale-100 group-hover:scale-[2] opacity-100 group-hover:opacity-0 transition-all duration-700"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-white/40 scale-100 group-hover:scale-[2.5] opacity-100 group-hover:opacity-0 transition-all duration-1000"></div>
             </button>
           </Link>
         </div>
       </div>
 
-      {/* ✨ ENHANCED: Custom animations */}
       <style jsx>{`
-        @keyframes fadeIn {
-          from {
+        @keyframes cardFloat {
+          0% {
             opacity: 0;
-            transform: translateY(-10px);
+            transform: translateY(50px) scale(0.9) rotateX(10deg);
           }
-          to {
+          100% {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(0) scale(1) rotateX(0deg);
           }
         }
 
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
+        @keyframes blob {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
           }
-          to {
-            opacity: 1;
-            transform: translateY(0);
+          25% {
+            transform: translate(20px, -50px) scale(1.1);
           }
+          50% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+          75% {
+            transform: translate(50px, 50px) scale(1.05);
+          }
+        }
+
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+
+        .animation-delay-1000 {
+          animation-delay: 1s;
         }
       `}</style>
     </>
