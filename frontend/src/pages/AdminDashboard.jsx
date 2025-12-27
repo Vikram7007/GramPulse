@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle, XCircle, Flag, ThumbsUp, MessageSquare, Upload, AlertCircle, Clock, Camera, FileText, User, TrendingUp, Award, MapPin, Calendar, Search, Filter } from 'lucide-react';
 import api from '../utils/api';
 import { notifyError, notifySuccess } from '../components/NotificationToast';
-import ReturnToDashboard from './ReturnToDashboard'
-      
+import ReturnToDashboard from './ReturnToDashboard';
+
 // तुझ्या Cloudinary account चे details – बदलून टाक
-const CLOUDINARY_CLOUD_NAME = 'dkwuxbwkn'; // तुझा cloud name
-const CLOUDINARY_UPLOAD_PRESET = 'grampulse_unsigned'; // तुझा unsigned preset
+const CLOUDINARY_CLOUD_NAME = 'dkwuxbwkn';
+const CLOUDINARY_UPLOAD_PRESET = 'grampulse_unsigned';
 
 const GramSevakDashboard = () => {
   const [gramSevak] = useState({
@@ -24,12 +24,12 @@ const GramSevakDashboard = () => {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [comment, setComment] = useState('');
-  const [issueProofUrls, setIssueProofUrls] = useState({}); // प्रत्येक issue साठी local proof URLs
+  const [issueProofUrls, setIssueProofUrls] = useState({});
   const [uploadingProof, setUploadingProof] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [weekFilter, setWeekFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState('all'); // नवीन: टॅब साठी
+  const [activeTab, setActiveTab] = useState('all');
 
   const newNotificationsCount = notifications.length;
 
@@ -61,7 +61,7 @@ const GramSevakDashboard = () => {
     }
   };
 
-  // फोटो निवडताक्षण automatic अपलोड होईल (specific issue साठी)
+  // फोटो निवडताक्षण automatic अपलोड होईल
   const handleProofFileChange = async (e, issueId) => {
     const files = e.target.files;
     if (files.length === 0) return;
@@ -86,7 +86,7 @@ const GramSevakDashboard = () => {
       notifyError('काही फोटो अपलोड करताना त्रुटी');
     } finally {
       setUploadingProof(false);
-      e.target.value = ''; // reset input
+      e.target.value = '';
     }
   };
 
@@ -164,7 +164,6 @@ const GramSevakDashboard = () => {
       return;
     }
 
-    // पूर्ण schema नुसार सगळे fields backend ला पाठवतो
     const payload = {
       type: issue.type,
       description: issue.description,
@@ -189,8 +188,8 @@ const GramSevakDashboard = () => {
 
     try {
       const res = await api.patch(`/issues/gramsevek/${issue._id}/approval`, payload);
-      const ChnageStatus=await api.patch(`/issues/gramsevek/${payload.status}/${issue._id}`)
-      console.log(ChnageStatus)
+      await api.patch(`/issues/gramsevek/${payload.status}/${issue._id}`);
+
       setIssues(prev => prev.map(i =>
         i._id === issue._id
           ? { ...i, ...res.data.gramSevakIssue, statusChanged: false }
@@ -199,7 +198,6 @@ const GramSevakDashboard = () => {
 
       notifySuccess('अपडेट यशस्वी!');
 
-      // Clear local state
       setIssueProofUrls(prev => {
         const newState = { ...prev };
         delete newState[issue._id];
@@ -268,7 +266,6 @@ const GramSevakDashboard = () => {
     totalVotes: filteredIssues.reduce((sum, issue) => sum + (issue.votes?.length || 0), 0)
   };
 
-  // टॅब नुसार issues फिल्टर करा
   const displayedIssues = activeTab === 'all' 
     ? filteredIssues 
     : filteredIssues.filter(issue => {
@@ -289,8 +286,8 @@ const GramSevakDashboard = () => {
                 <User className="w-8 h-8 text-green-600" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">ग्रामसेवक डॅशबोर्ड</h1>
-                <p className="text-green-100 text-base flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-white">ग्रामसेवक डॅशबोर्ड</h1>
+                <p className="text-green-100 text-sm flex items-center gap-2">
                   <span className="font-semibold">{gramSevak.name}</span>
                   <span className="text-green-200">|</span>
                   <MapPin className="w-4 h-4" />
@@ -316,7 +313,7 @@ const GramSevakDashboard = () => {
               {showNotifications && (
                 <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl overflow-hidden animate-slideDown z-50">
                   <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-5 py-3">
-                    <h3 className="text-white font-bold text-lg">सूचना ({newNotificationsCount})</h3>
+                    <h3 className="text-white font-bold text-base">सूचना ({newNotificationsCount})</h3>
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {notifications.length === 0 ? (
@@ -340,53 +337,53 @@ const GramSevakDashboard = () => {
           </div>
         </div>
       </div>
- <ReturnToDashboard/>
+
+      <ReturnToDashboard />
+
       <div className="max-w-7xl mx-auto mt-10 px-6 py-8">
         {/* Stats Cards */}
-        
-             
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-green-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl animate-fadeIn">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-600 text-sm font-semibold uppercase tracking-wide mb-1">एकूण समस्या</p>
-                <p className="text-4xl font-bold text-green-800">{stats.total}</p>
+                <p className="text-green-600 text-xs font-semibold uppercase tracking-wide mb-1">एकूण समस्या</p>
+                <p className="text-3xl font-bold text-green-800">{stats.total}</p>
               </div>
               <div className="bg-green-100 p-4 rounded-full">
-                <FileText className="w-8 h-8 text-green-600" />
+                <FileText className="w-7 h-7 text-green-600" />
               </div>
             </div>
           </div>
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl animate-fadeIn" style={{animationDelay: '0.1s'}}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-600 text-sm font-semibold uppercase tracking-wide mb-1">प्रगतीत</p>
-                <p className="text-4xl font-bold text-blue-800">{stats.inProgress}</p>
+                <p className="text-blue-600 text-xs font-semibold uppercase tracking-wide mb-1">प्रगतीत</p>
+                <p className="text-3xl font-bold text-blue-800">{stats.inProgress}</p>
               </div>
               <div className="bg-blue-100 p-4 rounded-full">
-                <Clock className="w-8 h-8 text-blue-600" />
+                <Clock className="w-7 h-7 text-blue-600" />
               </div>
             </div>
           </div>
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-emerald-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl animate-fadeIn" style={{animationDelay: '0.2s'}}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-emerald-600 text-sm font-semibold uppercase tracking-wide mb-1">पूर्ण झाले</p>
-                <p className="text-4xl font-bold text-emerald-800">{stats.completed}</p>
+                <p className="text-emerald-600 text-xs font-semibold uppercase tracking-wide mb-1">पूर्ण झाले</p>
+                <p className="text-3xl font-bold text-emerald-800">{stats.completed}</p>
               </div>
               <div className="bg-emerald-100 p-4 rounded-full">
-                <CheckCircle className="w-8 h-8 text-emerald-600" />
+                <CheckCircle className="w-7 h-7 text-emerald-600" />
               </div>
             </div>
           </div>
           <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-orange-500 transform transition-all duration-300 hover:scale-105 hover:shadow-xl animate-fadeIn" style={{animationDelay: '0.3s'}}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-600 text-sm font-semibold uppercase tracking-wide mb-1">एकूण मते</p>
-                <p className="text-4xl font-bold text-orange-800">{stats.totalVotes}</p>
+                <p className="text-orange-600 text-xs font-semibold uppercase tracking-wide mb-1">एकूण मते</p>
+                <p className="text-3xl font-bold text-orange-800">{stats.totalVotes}</p>
               </div>
               <div className="bg-orange-100 p-4 rounded-full">
-                <Award className="w-8 h-8 text-orange-600" />
+                <Award className="w-7 h-7 text-orange-600" />
               </div>
             </div>
           </div>
@@ -402,7 +399,7 @@ const GramSevakDashboard = () => {
                 placeholder="समस्येच्या नावाने शोधा..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border-2 border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-green-900"
+                className="w-full pl-12 pr-4 py-3 border-2 border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-green-900 text-base"
               />
             </div>
             <div className="flex items-center gap-3">
@@ -410,7 +407,7 @@ const GramSevakDashboard = () => {
               <select
                 value={weekFilter}
                 onChange={(e) => setWeekFilter(e.target.value)}
-                className="px-5 py-3 border-2 border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-green-900 font-medium"
+                className="px-5 py-3 border-2 border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-green-900 font-medium text-base"
               >
                 <option value="all">सर्व समस्या</option>
                 <option value="thisWeek">हा आठवडा</option>
@@ -420,13 +417,13 @@ const GramSevakDashboard = () => {
           </div>
         </div>
 
-        {/* Simple 3 Buttons for Category Tabs */}
-        <div className="mb-6 flex justify-center gap-4">
+        {/* Category Tabs */}
+        <div className="mb-6 flex flex-wrap justify-center gap-3">
           <button
             onClick={() => setActiveTab('all')}
-            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+            className={`px-7 py-2.5 rounded-xl font-bold text-base transition-all duration-300 shadow-md ${
               activeTab === 'all' 
-                ? 'bg-green-600 text-white shadow-lg' 
+                ? 'bg-green-600 text-white shadow-green-400/50' 
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -434,9 +431,9 @@ const GramSevakDashboard = () => {
           </button>
           <button
             onClick={() => setActiveTab('pending')}
-            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+            className={`px-7 py-2.5 rounded-xl font-bold text-base transition-all duration-300 shadow-md ${
               activeTab === 'pending' 
-                ? 'bg-blue-600 text-white shadow-lg' 
+                ? 'bg-blue-600 text-white shadow-blue-400/50' 
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -444,9 +441,9 @@ const GramSevakDashboard = () => {
           </button>
           <button
             onClick={() => setActiveTab('completed')}
-            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+            className={`px-7 py-2.5 rounded-xl font-bold text-base transition-all duration-300 shadow-md ${
               activeTab === 'completed' 
-                ? 'bg-emerald-600 text-white shadow-lg' 
+                ? 'bg-emerald-600 text-white shadow-emerald-400/50' 
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -454,9 +451,9 @@ const GramSevakDashboard = () => {
           </button>
           <button
             onClick={() => setActiveTab('rejected')}
-            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+            className={`px-7 py-2.5 rounded-xl font-bold text-base transition-all duration-300 shadow-md ${
               activeTab === 'rejected' 
-                ? 'bg-red-600 text-white shadow-lg' 
+                ? 'bg-red-600 text-white shadow-red-400/50' 
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -464,21 +461,21 @@ const GramSevakDashboard = () => {
           </button>
         </div>
 
-        {/* Issues Grid – एकच grid, फक्त फिल्टर केलेले cards */}
+        {/* Issues Grid */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-green-800 mb-6 flex items-center gap-2">
-            <FileText className="w-7 h-7" />
+          <h2 className="text-xl font-bold text-green-800 mb-6 flex items-center gap-2">
+            <FileText className="w-6 h-6" />
             नियुक्त समस्या ({displayedIssues.length})
           </h2>
           {loading ? (
             <div className="text-center py-20">
               <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-green-600 mx-auto"></div>
-              <p className="mt-6 text-green-700 text-xl">समस्यांची यादी लोड होत आहे...</p>
+              <p className="mt-6 text-green-700 text-lg">समस्यांची यादी लोड होत आहे...</p>
             </div>
           ) : displayedIssues.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-2xl shadow-lg">
               <FileText className="w-20 h-20 text-green-300 mx-auto mb-4" />
-              <p className="text-2xl text-green-700 font-semibold">
+              <p className="text-xl text-green-700 font-semibold">
                 या श्रेणीमध्ये सध्या कोणतीही समस्या नाही
               </p>
             </div>
@@ -490,15 +487,14 @@ const GramSevakDashboard = () => {
                   className="bg-white rounded-2xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-102 hover:shadow-2xl border-2 border-green-100"
                   style={{animation: `slideUp 0.5s ease-out ${index * 0.15}s both`}}
                 >
-                  {/* Issue Header */}
                   <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-4">
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-xl font-bold text-white flex-1">{issue.type}</h3>
+                      <h3 className="text-lg font-bold text-white flex-1">{issue.type}</h3>
                       <span className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 ${getPriorityColor(issue.priority)}`}>
                         {issue.priority === 'high' ? 'उच्च' : issue.priority === 'medium' ? 'मध्यम' : 'कमी'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-white text-sm">
+                    <div className="flex items-center gap-4 text-white text-xs">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
                         {new Date(issue.createdAt).toLocaleDateString('mr-IN')}
@@ -509,15 +505,13 @@ const GramSevakDashboard = () => {
                       </span>
                     </div>
                   </div>
-                  {/* Issue Body */}
                   <div className="p-6">
-                    <p className="text-green-900 text-base mb-4 leading-relaxed">{issue.description}</p>
-                    {/* Photo & Map Section */}
+                    <p className="text-green-900 text-sm mb-4 leading-relaxed">{issue.description}</p>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="bg-green-50 rounded-xl p-4 border-2 border-green-200">
                         <div className="flex items-center gap-2 mb-2">
                           <Camera className="w-4 h-4 text-green-600" />
-                          <span className="text-green-700 font-semibold text-sm">समस्येचा फोटो</span>
+                          <span className="text-green-700 font-semibold text-xs">समस्येचा फोटो</span>
                         </div>
                         {issue.images && issue.images.length > 0 ? (
                           <img
@@ -535,44 +529,40 @@ const GramSevakDashboard = () => {
                       <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
                         <div className="flex items-center gap-2 mb-2">
                           <MapPin className="w-4 h-4 text-blue-600" />
-                          <span className="text-blue-700 font-semibold text-sm">स्थान नकाशा</span>
+                          <span className="text-blue-700 font-semibold text-xs">स्थान नकाशा</span>
                         </div>
                         <div className="bg-blue-200 h-32 rounded-lg flex items-center justify-center">
                           <MapPin className="w-12 h-12 text-blue-600" />
                         </div>
                       </div>
                     </div>
-                    {/* Status Indicator */}
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-green-800 font-semibold text-sm">सध्याची स्थिती:</span>
-                        <span className={`px-3 py-1 rounded-full text-white text-sm font-semibold ${getStatusColor(issue.status)}`}>
-                          {issue.status === 'in-progress' ? '⏳ प्रगतीत आहे' : issue.status === 'Completed' ? '✅ पूर्ण' : '⚠️ अडचण'}
+                        <span className="text-green-800 font-semibold text-xs">सध्याची स्थिती:</span>
+                        <span className={`px-3 py-1 rounded-full text-white text-xs font-semibold ${getStatusColor(issue.status)}`}>
+                          {issue.status === 'in-progress' ? 'प्रगतीत आहे' : issue.status === 'Completed' ? 'पूर्ण' : 'अडचण'}
                         </span>
                       </div>
                     </div>
-                    {/* Comments Display */}
                     {(issue.comments || []).length > 0 && (
                       <div className="mb-4 bg-green-50 rounded-xl p-4 border-2 border-green-200">
-                        <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                        <h4 className="font-semibold text-green-800 text-sm mb-3 flex items-center gap-2">
                           <MessageSquare className="w-4 h-4" />
                           प्रगती टिप्पणी ({issue.comments.length})
                         </h4>
                         <div className="space-y-2 max-h-32 overflow-y-auto">
                           {issue.comments.map((comm, idx) => (
                             <div key={idx} className="bg-white rounded-lg p-3 border border-green-200">
-                              <p className="text-green-900 text-sm mb-1">{comm.text}</p>
+                              <p className="text-green-900 text-xs mb-1">{comm.text}</p>
                               <p className="text-green-600 text-xs">{comm.date} - {comm.time}</p>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
-                    
-                    {/* Uploaded Proof Photos Display */}
                     {issueProofUrls[issue._id] && issueProofUrls[issue._id].length > 0 && (
                       <div className="mb-4 bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
-                        <h4 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                        <h4 className="font-semibold text-orange-800 text-sm mb-3 flex items-center gap-2">
                           <Camera className="w-4 h-4" />
                           अपलोड केलेले पुरावा फोटो ({issueProofUrls[issue._id].length})
                         </h4>
@@ -595,13 +585,11 @@ const GramSevakDashboard = () => {
                         </div>
                       </div>
                     )}
-
-                    {/* Action Buttons */}
                     <div className="space-y-3">
                       <div className="grid grid-cols-3 gap-3">
                         <button
                           onClick={() => updateStatus(issue._id, 'in-progress')}
-                          className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
+                          className={`px-3 py-2.5 rounded-xl font-medium text-xs transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-1 ${
                             issue.status === 'in-progress'
                               ? 'bg-blue-500 text-white shadow-lg'
                               : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
@@ -612,7 +600,7 @@ const GramSevakDashboard = () => {
                         </button>
                         <button
                           onClick={() => updateStatus(issue._id, 'Completed')}
-                          className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
+                          className={`px-3 py-2.5 rounded-xl font-medium text-xs transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-1 ${
                             issue.status === 'Completed'
                               ? 'bg-green-500 text-white shadow-lg'
                               : 'bg-green-100 text-green-700 hover:bg-green-200'
@@ -623,7 +611,7 @@ const GramSevakDashboard = () => {
                         </button>
                         <button
                           onClick={() => updateStatus(issue._id, 'Issue')}
-                          className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
+                          className={`px-3 py-2.5 rounded-xl font-medium text-xs transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-1 ${
                             issue.status === 'Issue'
                               ? 'bg-red-500 text-white shadow-lg'
                               : 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -639,14 +627,12 @@ const GramSevakDashboard = () => {
                             setSelectedIssue(issue);
                             setShowCommentModal(true);
                           }}
-                          className="px-4 py-3 bg-purple-500 text-white rounded-xl font-semibold text-sm hover:bg-purple-600 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 shadow-md"
+                          className="px-3 py-2.5 bg-purple-500 text-white rounded-xl font-medium text-xs hover:bg-purple-600 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-1 shadow-md"
                         >
                           <MessageSquare className="w-4 h-4" />
                           टिप्पणी जोडा
                         </button>
-                        
-                        {/* Upload Button */}
-                        <label className="px-4 py-3 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 shadow-md cursor-pointer">
+                        <label className="px-3 py-2.5 bg-orange-500 text-white rounded-xl font-medium text-xs hover:bg-orange-600 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-1 shadow-md cursor-pointer">
                           <Upload className="w-4 h-4" />
                           {uploadingProof ? 'अपलोड होत आहे...' : 'पुरावा अपलोड'}
                           <input
@@ -661,9 +647,9 @@ const GramSevakDashboard = () => {
                       </div>
                       <button
                         onClick={() => handleSubmitUpdate(issue)}
-                        className="w-full mt-4 px-6 py-3 bg-green-600 text-white rounded-xl font-bold text-base hover:bg-green-700 transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+                        className="w-full mt-4 px-5 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
                       >
-                        <CheckCircle className="w-6 h-6" />
+                        <CheckCircle className="w-5 h-5" />
                         अपडेट सबमिट करा
                       </button>
                     </div>
@@ -680,7 +666,7 @@ const GramSevakDashboard = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full transform transition-all duration-300 scale-100">
             <div className="bg-gradient-to-r from-purple-600 to-purple-500 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 <MessageSquare className="w-6 h-6" />
                 प्रगती टिप्पणी जोडा
               </h3>
@@ -697,23 +683,23 @@ const GramSevakDashboard = () => {
             </div>
             <div className="p-6">
               <div className="mb-5 bg-green-50 rounded-xl p-4 border-2 border-green-200">
-                <h4 className="font-bold text-green-900 text-lg mb-2">{selectedIssue?.type}</h4>
+                <h4 className="font-bold text-green-900 text-base mb-2">{selectedIssue?.type}</h4>
                 <p className="text-green-700 text-sm">{selectedIssue?.description}</p>
               </div>
-              <label className="block text-green-800 font-semibold mb-3 text-base">
+              <label className="block text-green-800 font-semibold mb-3 text-sm">
                 आजचे काम / प्रगती
               </label>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="आज काय काम केले ते येथे लिहा..."
-                className="w-full h-40 px-4 py-3 border-2 border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-green-900 resize-none"
+                className="w-full h-40 px-4 py-3 border-2 border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-green-900 resize-none text-base"
               />
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={addComment}
                   disabled={!comment.trim()}
-                  className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold text-sm hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 flex items-center justify-center gap-2"
                 >
                   <CheckCircle className="w-5 h-5" />
                   टिप्पणी जतन करा
@@ -724,7 +710,7 @@ const GramSevakDashboard = () => {
                     setComment('');
                     setSelectedIssue(null);
                   }}
-                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-all duration-200"
+                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold text-sm hover:bg-gray-300 transition-all duration-200"
                 >
                   रद्द करा
                 </button>
